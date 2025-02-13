@@ -1,0 +1,14 @@
+*.zip
+*.pdf
+*.suo
+.venv
+Paper Review/
+*.vtt
+*.json
+KorQuAD_2.1_train_12/*.json
+KorQuAD_2.1_train_12/
+Samples/
+Samples_Result/
+*.png
+*.jpg
+*.txt
