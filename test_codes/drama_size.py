@@ -1,58 +1,83 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.chrome.options import Options
+from dotenv import load_dotenv
+import os
 import time
 
-# Chrome 드라이버 경로 설정
-chrome_driver_path = 'path/to/chromedriver'  # 경로를 본인의 크롬 드라이버 경로로 설정
+# .env 파일 로드
+load_dotenv()
 
-# Selenium을 사용할 Chrome 옵션 설정
-chrome_options = Options()
-chrome_options.add_argument("--headless")  # 창을 띄우지 않고 실행
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--no-sandbox")
+# 환경 변수에서 ID와 PW 읽어오기
+netflix_id = os.getenv("NETFLIX_ID")
+netflix_pw = os.getenv("NETFLIX_PW")
 
 # 웹 드라이버 실행
 driver = webdriver.Chrome()
 
-# 넷플릭스 드라마 페이지로 이동
-url = 'https://www.netflix.com/watch/81618456'  # 원하는 드라마의 URL을 입력
+# 넷플릭스 로그인 페이지로 이동
+url = 'https://www.netflix.com/login'
 driver.get(url)
 
-# 로그인 (수동으로 로그인 후 자동화 시작)
-input("로그인 후 Enter 키를 눌러주세요.")
+# ID와 PW 입력 및 로그인 시도
+try:
+    # 이메일 입력란 찾기
+    email_input = driver.find_element(By.NAME, "userLoginId")
+    email_input.send_keys(netflix_id)
+    
+    # 비밀번호 입력란 찾기
+    password_input = driver.find_element(By.NAME, "password")
+    password_input.send_keys(netflix_pw)
+    
+    # 로그인 버튼 클릭
+    password_input.send_keys(Keys.RETURN)
+    
+    # 로그인 후 페이지가 로드될 때까지 잠시 대기
+    time.sleep(5)
+
+    print("자동 로그인 성공!")
+
+except Exception as e:
+    print(f"로그인 오류: {e}")
+
+# 넷플릭스 드라마 페이지로 이동 (이 부분을 수동으로 설정한 URL로 대체)
+url = 'https://www.netflix.com/watch/81618456'  # 원하는 드라마의 URL을 입력
+driver.get(url)
 
 # 비디오가 로드될 때까지 기다리기
 time.sleep(5)  # 비디오 로드 대기 (시간 조정 필요할 수 있음)
 
-# 에피소드 목록이 로드되면, 각 에피소드의 길이 추출
-episode_lengths = []
-
-# 에피소드 길이 추출
+# 슬라이더 요소 찾기
 try:
-    episodes = driver.find_elements(By.CSS_SELECTOR, "span[data-uia='video-title']")  # 에피소드 제목을 찾음
-    durations = driver.find_elements(By.CSS_SELECTOR, "span[data-uia='video-duration']")  # 에피소드 길이를 찾음
-
-    for duration in durations:
-        episode_lengths.append(duration.text)
+    # 현재 시간과 전체 시간을 담고 있는 슬라이더 찾기
+    slider = driver.find_element(By.CSS_SELECTOR, "button[aria-label='재생 시간 표시줄']")  # 해당 버튼 찾기
+    aria_value = driver.find_element(By.CSS_SELECTOR, "div[aria-valuetext]")  # aria-valuetext 값 찾기
     
-    # 각 에피소드 길이 출력
-    print("에피소드 길이들: ", episode_lengths)
+    # 전체 비디오 길이와 현재 재생 시간 추출 (초 단위)
+    total_time = int(aria_value.get_attribute('aria-valuemax'))  # 전체 시간
+    current_time = int(aria_value.get_attribute('aria-valuenow'))  # 현재 시간
+
+    # 목표 시간 설정 (예: 2분 7초 = 127초)
+    target_time = 127
+
+    # 목표 시간으로 이동할 비율 계산
+    move_ratio = target_time / total_time
+
+    # 슬라이더 크기 가져오기
+    slider_width = slider.size['width']
+
+    # 이동할 거리 계산
+    move_distance = move_ratio * slider_width
+
+    # 슬라이더를 해당 위치로 이동
+    actions = ActionChains(driver)
+    actions.click_and_hold(slider).move_by_offset(move_distance, 0).release().perform()
+
+    print(f"슬라이더를 {target_time}초로 이동 완료")
 
 except Exception as e:
-    print(f"에피소드 길이 추출 오류: {e}")
-
-# 각 에피소드 길이를 합산하여 총 시간을 계산
-total_minutes = 0
-for length in episode_lengths:
-    # "00:42"와 같은 형식에서 분과 초를 추출
-    minutes, seconds = map(int, length.split(":"))
-    total_minutes += minutes + seconds / 60
-
-# 총 시간 출력
-print(f"드라마 총 길이: {total_minutes:.2f} 분")
+    print(f"슬라이더 이동 오류: {e}")
 
 # 드라이버 종료
 driver.quit()
