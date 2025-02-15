@@ -4,7 +4,8 @@ import json
 
 def clean_vtt(vtt_data):
     # 타임스탬프 뒤의 불필요한 position 정보 제거
-    cleaned_data = re.sub(r'(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}) .*', r'\1', vtt_data)
+    cleaned_data = re.sub(r'(\d{2}:\d{2}:\d{2})\.\d{3} --> (\d{2}:\d{2}:\d{2})\.\d{3} .*', r'\1 --> \2', vtt_data)
+    
     # 대괄호나 소괄호 안의 내용 제거
     cleaned_data = re.sub(r'\[.*?\]|\(.*?\)', '', cleaned_data)
 

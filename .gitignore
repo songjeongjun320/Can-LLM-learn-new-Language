@@ -14,3 +14,4 @@ Samples_Result/
 *.txt
 *.csv
 adiamaan/
+.env
