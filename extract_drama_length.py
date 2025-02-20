@@ -189,6 +189,11 @@ time.sleep(5)
 video_length = ""
 checked = False
 
+timestamps_list =[]
+######################
+# timestamps_list 안에 있는 시간 - current_time이 >10 일경우, 
+# 10초 건너뛰기 버튼 누르기
+######################
 while True:
     try:
         # 남은 시간 정보가 있는 <span> 태그 찾기
