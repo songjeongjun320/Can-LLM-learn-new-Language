@@ -9,6 +9,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 #########################################################
+# 필요함수
+#########################################################
+# 시간 형식 'HH:MM:SS'를 초로 변환하는 함수
+def time_to_seconds(time_str):
+    h, m, s = map(int, time_str.split(':'))
+    return h * 3600 + m * 60 + s
+
+# 초를 'HH:MM:SS' 형식으로 변환하는 함수
+def seconds_to_time(seconds):
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:02}:{m:02}:{s:02}"
+
+#########################################################
 # 로그인 자동화
 #########################################################
 
@@ -92,97 +107,114 @@ time.sleep(5)
 with open('drama_title.txt', 'r', encoding='utf-8') as file:
     drama_title = file.readline().strip()
 
+# 드라마 제목을 입력한 후, 검색창에 제목을 입력
 try:
-    # search-icon 클래스를 가진 검색 버튼 클릭
-    search_button = driver.find_element(By.CLASS_NAME, "search-icon")
+    # 검색 아이콘 클릭
+    search_button = driver.find_element(By.CLASS_NAME, "searchTab")
     search_button.click()
+    print(f"'{drama_title}' 검색 준비 완료!")
 
-    # 검색창 요소 찾기 (검색창의 입력 필드 찾기)
-    search_box = driver.find_element(By.CLASS_NAME, "searchBox")
-    
-    # 검색창에 drama_title 입력 후 엔터
-    search_box.send_keys(drama_title)
-    time.sleep(5)
-    ###################
-    # 여기부터 재작성 해야하는데, 검색한 이후에
-    # 엔터키 누르는게 아니라, 제목만 넣어논 이후에
-    # 가장 첫번째 드라마 클릭하는 코드로 변경해야함
-    ##################
-    search_box.send_keys(Keys.RETURN)
+    # 검색창이 로드될 때까지 대기
+    WebDriverWait(driver, 2).until(
+        EC.presence_of_element_located((By.CLASS_NAME, "searchInput"))
+    )
 
-    print(f"'{drama_title}' 검색 완료!")
+    # 검색창에 drama_title을 한 글자씩 0.5초마다 입력
+    search_box = driver.find_element(By.CLASS_NAME, "focus-visible")
+    for char in drama_title:
+        search_box.send_keys(char)
+        time.sleep(0.5)  # 0.5초 대기
+    print(f"'{drama_title}' 입력 완료!")
 
     # 검색 결과 대기 (적절한 시간 설정)
     time.sleep(5)
+
+    # 첫 번째 드라마 클릭 (제목을 입력한 후 클릭)
+    WebDriverWait(driver, 3).until(
+        EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".title-card"))
+    )
+
+    first_drama = driver.find_element(By.CSS_SELECTOR, ".title-card")
+    first_drama.click()
+    print(f"첫 번째 드라마 '{drama_title}' 클릭 완료!")
 
 except Exception as e:
     print(f"오류 발생: {e}")
 
 print(f"--LOG : 드라마 검색 성공", drama_title)
-time.sleep(10)
+time.sleep(3)
 
+#########################################################
+# 재생 클릭릭
+#########################################################
+print("--LOG : 재생 클릭 시도")
+try:
+    wait = WebDriverWait(driver, 3)
+    
+    # 재생 버튼을 찾아서 클릭 
+    play_button = wait.until(EC.element_to_be_clickable((
+        By.CSS_SELECTOR, 
+        "primary-button playLink isToolkit"
+    )))
+
+except Exception as e:
+    print(f"에러 발생: {e}")
+
+time.sleep(5)
 #########################################################
 # 드라마 검색 이후 페이지 이동, 드라마 길이 추출
 #########################################################
-while True:
-    try:
-        # LTR-1QTCBDE 클래스에서 시간 데이터 추출
-        time_remaining = driver.find_element(By.CLASS_NAME, "ltr-1qtcbde").text
-        print(f"남은 시간: {time_remaining}")
+# while True:
+#     try:
+#         # LTR-1QTCBDE 클래스에서 시간 데이터 추출
+#         time_remaining = driver.find_element(By.CLASS_NAME, "ltr-1qtcbde").text
+#         print(f"남은 시간: {time_remaining}")
         
-        # 시간이 '0'인 경우 종료
-        if time_remaining == "0":
-            print("시간이 0이 되어 종료됩니다.")
-            break
+#         # 시간이 '0'인 경우 종료
+#         if time_remaining == "0":
+#             print("시간이 0이 되어 종료됩니다.")
+#             break
         
-        # 1초 대기 후 다시 시도
-        time.sleep(1)
-    except Exception as e:
-        print(f"오류 발생: {e}")
-        break
+#         # 1초 대기 후 다시 시도
+#         time.sleep(1)
+#     except Exception as e:
+#         print(f"오류 발생: {e}")
+#         break
+
 #########################################################
 # 드라마 길이 추출
 #########################################################
+# 비디오의 남은 시간을 주기적으로 추출
 
+video_length = ""
+checked = False
 
-# 슬라이더 요소 찾기
-try:
-    print("--LOG : 슬라이더 요소 찾기...")
-    # 현재 시간과 전체 시간을 담고 있는 슬라이더 찾기
-    slider = driver.find_element(By.CSS_SELECTOR, "button[aria-label='재생 시간 표시줄']")  # 해당 버튼 찾기
-    aria_value = driver.find_element(By.CSS_SELECTOR, "div[aria-valuetext]")  # aria-valuetext 값 찾기
-    
-    # 전체 비디오 길이와 현재 재생 시간 추출 (초 단위)
-    print("--LOG : 전체 비디오 길이와 현재 재생 시간 추출 중...")
-    total_time = int(aria_value.get_attribute('aria-valuemax'))  # 전체 시간
-    current_time = int(aria_value.get_attribute('aria-valuenow'))  # 현재 시간
+while True:
+    try:
+        # 남은 시간 정보가 있는 <span> 태그 찾기
+        time_remaining_element = driver.find_element(By.CLASS_NAME, "ltr-1qtcbde")
+        time_remaining = time_remaining_element.text.strip()  # 남은 시간 텍스트 가져오기
 
-    # 목표 시간 설정 (예: 2분 7초 = 127초)
-    target_time = 127
-    print(f"--LOG : 목표 시간 {target_time}초 설정 완료")
+        if not checked:
+            video_length = time_remaining  # 전체 길이 저장
+            checked = True
 
-    # 목표 시간으로 이동할 비율 계산
-    move_ratio = target_time / total_time
-    print(f"--LOG : 목표 시간 비율 계산: {move_ratio}")
+        # video_length와 time_remaining을 초 단위로 변환
+        video_length_seconds = time_to_seconds(video_length)
+        time_remaining_seconds = time_to_seconds(time_remaining)
 
-    # 슬라이더 크기 가져오기
-    slider_width = slider.size['width']
-    print(f"--LOG : 슬라이더 크기: {slider_width} 픽셀")
+        # 현재 시간 계산 (전체 시간 - 남은 시간)
+        current_time_seconds = video_length_seconds - time_remaining_seconds
 
-    # 이동할 거리 계산
-    move_distance = move_ratio * slider_width
-    print(f"--LOG : 이동할 거리 계산 완료: {move_distance} 픽셀")
+        # 계산된 초를 다시 'HH:MM:SS' 형식으로 변환
+        current_time = seconds_to_time(current_time_seconds)
 
-    # 슬라이더를 해당 위치로 이동
-    print("--LOG : 슬라이더 이동 시작...")
-    actions = ActionChains(driver)
-    actions.click_and_hold(slider).move_by_offset(move_distance, 0).release().perform()
+        # 남은 시간 출력
+        print(f"남은 시간: {current_time}")
 
-    print(f"--LOG : 슬라이더를 {target_time}초로 이동 완료")
-
-except Exception as e:
-    print(f"--ERROR : 슬라이더 이동 오류 - {e}")
-
-# 드라이버 종료
-print("--LOG : 드라이버 종료 중...")
-driver.quit()
+        # 마우스를 아래쪽으로 계속 이동시켜서 비디오 제어 바가 사라지지 않게 유지
+        action = ActionChains(driver)
+        action.move_to_element(time_remaining_element).move_by_offset(0, 50).perform()  # y값을 증가시켜 마우스를 아래로 이동시킴
+        
+    finally:
+        time.sleep(0.5)

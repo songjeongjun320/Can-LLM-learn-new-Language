@@ -5,6 +5,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from dotenv import load_dotenv
 import os
 import time
+from datetime import timedelta
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
