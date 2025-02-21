@@ -6,8 +6,8 @@ model = BertForQuestionAnswering.from_pretrained("bert-base-uncased")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
 # 질문과 문서 준비
-question = "혹시 한국말 할줄 아나?"
-context = ""
+question = "대한민국의 수도는 어디야?"
+context = "서울특별시는 대한민국의 수도[22]이자 최대도시이며, 대한민국 유일의 특별시이다. ... 역사적으로도 백제, 조선, 대한제국의 수도이자 현재 대한민국의 수도로서 중요성이 ..."
 
 # 입력 데이터 준비
 inputs = tokenizer(question, context, return_tensors="pt")
