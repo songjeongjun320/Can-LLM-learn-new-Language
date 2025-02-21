@@ -2,11 +2,18 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
-from dotenv import load_dotenv
-import os
-import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from dotenv import load_dotenv
+from PIL import ImageGrab
+import os
+import time
+import json
+#######################
+# 폴더 가져오기
+#######################
+import extract_timestamp
+
 
 #########################################################
 # 필요함수
@@ -46,6 +53,8 @@ driver = webdriver.Chrome()
 url = 'https://www.netflix.com/login'
 print("--LOG : 넷플릭스 로그인 페이지로 이동 중...")
 driver.get(url)
+
+time.sleep(2)
 
 # ID와 PW 입력 및 로그인 시도
 try:
@@ -107,6 +116,11 @@ time.sleep(5)
 with open('drama_title.txt', 'r', encoding='utf-8') as file:
     drama_title = file.readline().strip()
 
+# 경로 설정: screenshots
+folder_path = os.path.join("screenshots", drama_title)
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)  # 폴더가 없으면 생성
+
 # 드라마 제목을 입력한 후, 검색창에 제목을 입력
 try:
     # 검색 아이콘 클릭
@@ -149,77 +163,88 @@ time.sleep(3)
 #########################################################
 print("--LOG : 재생 클릭 시도")
 try:
-    wait = WebDriverWait(driver, 3)
-    
-    # 재생 버튼을 찾아서 클릭 
-    play_button = wait.until(EC.element_to_be_clickable((
-        By.CSS_SELECTOR, 
-        "primary-button playLink isToolkit"
-    )))
+    # 1. aria-label이 "재생"인 a 태그 찾기
+    play_link = driver.find_element(By.XPATH, "//a[@aria-label='재생']")
+
+    # 2. a 태그 밑에 있는 버튼 찾기
+    button = play_link.find_element(By.XPATH, ".//button")
+
+    # 3. 버튼 클릭
+    button.click()
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "ltr-1qtcbde")))
 
 except Exception as e:
     print(f"에러 발생: {e}")
 
-time.sleep(5)
-#########################################################
-# 드라마 검색 이후 페이지 이동, 드라마 길이 추출
-#########################################################
-# while True:
-#     try:
-#         # LTR-1QTCBDE 클래스에서 시간 데이터 추출
-#         time_remaining = driver.find_element(By.CLASS_NAME, "ltr-1qtcbde").text
-#         print(f"남은 시간: {time_remaining}")
-        
-#         # 시간이 '0'인 경우 종료
-#         if time_remaining == "0":
-#             print("시간이 0이 되어 종료됩니다.")
-#             break
-        
-#         # 1초 대기 후 다시 시도
-#         time.sleep(1)
-#     except Exception as e:
-#         print(f"오류 발생: {e}")
-#         break
-
-#########################################################
-# 드라마 길이 추출
-#########################################################
-# 비디오의 남은 시간을 주기적으로 추출
+######################
+# timestamp 리스트 extract_timestamp.py 로부터 받아오기
+# 나중에 자동화 해야함.
+######################
+timestamp_list = extract_timestamp.extract_timestamp()
+# print("--LOG : timestamp = ", timestamp_list)
 
 video_length = ""
 checked = False
 
-timestamps_list =[]
-######################
-# timestamps_list 안에 있는 시간 - current_time이 >10 일경우, 
-# 10초 건너뛰기 버튼 누르기
-######################
 while True:
     try:
         # 남은 시간 정보가 있는 <span> 태그 찾기
         time_remaining_element = driver.find_element(By.CLASS_NAME, "ltr-1qtcbde")
         time_remaining = time_remaining_element.text.strip()  # 남은 시간 텍스트 가져오기
+        print("--LOG 남은시간: ", time_remaining)
 
+        # 체크할 데이터 없으면 정지
+        if len(timestamp_list) == 0:
+            break
+
+        # 마우스를 아래쪽으로 계속 이동시켜서 비디오 제어 바가 사라지지 않게 유지
+        action = ActionChains(driver)
+        action.move_to_element(time_remaining_element).move_by_offset(0, 50).perform()  # y값을 증가시켜 마우스를 아래로 이동시킴
+       
         if not checked:
             video_length = time_remaining  # 전체 길이 저장
             checked = True
+            print("--LOG 비디오 길이: ", video_length)
 
         # video_length와 time_remaining을 초 단위로 변환
         video_length_seconds = time_to_seconds(video_length)
         time_remaining_seconds = time_to_seconds(time_remaining)
+        time_need_to_be_checked = time_to_seconds(timestamp_list[0])
+        action.move_to_element(time_remaining_element).move_by_offset(0, 50).perform()  # y값을 증가시켜 마우스를 아래로 이동시킴
 
         # 현재 시간 계산 (전체 시간 - 남은 시간)
         current_time_seconds = video_length_seconds - time_remaining_seconds
 
+        print("--LOG current_time : ", current_time_seconds)
+        print("--LOG timestamp[0] : ", time_need_to_be_checked)
+
+        # timestamp_list[0] 안에 있는 시간 - current_time이 > 11 일경우, 10초 건너뛰기 버튼 누르기
+        # print("--LOG : 찍혀야 하는 시간 - 현재시간: ", time_need_to_be_checked - current_time_seconds)
+        # if abs(current_time_seconds - time_need_to_be_checked) > 11:
+        #     # 건너뛰기 버튼 클릭 (버튼을 찾아 클릭)
+        #     skip_button = driver.find_element(By.XPATH, "//button[@aria-label='앞으로 가기']")
+        #     skip_button.click()
+        
         # 계산된 초를 다시 'HH:MM:SS' 형식으로 변환
         current_time = seconds_to_time(current_time_seconds)
 
         # 남은 시간 출력
         print(f"남은 시간: {current_time}")
-
-        # 마우스를 아래쪽으로 계속 이동시켜서 비디오 제어 바가 사라지지 않게 유지
-        action = ActionChains(driver)
         action.move_to_element(time_remaining_element).move_by_offset(0, 50).perform()  # y값을 증가시켜 마우스를 아래로 이동시킴
-        
+
+        # 파일 경로 생성
+        file_name = f"{drama_title}_{current_time.replace(':', '_')}.png"
+        file_path = os.path.join(folder_path, file_name)
+        print("--LOG : 파일경로 생성 : ", file_path)
+
+        # 스크린샷을 해당 경로에 저장
+        if current_time_seconds == time_need_to_be_checked:
+            screenshot = ImageGrab.grab()
+            screenshot.save(file_path)
+
+            print(f"스크린샷이 저장되었습니다: {file_path}")
+
+        action.move_to_element(time_remaining_element).move_by_offset(0, 50).perform()  # y값을 증가시켜 마우스를 아래로 이동시킴
+
     finally:
-        time.sleep(0.5)
+        time.sleep(0.3)
