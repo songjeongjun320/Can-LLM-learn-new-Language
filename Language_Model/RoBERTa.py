@@ -1,7 +1,8 @@
+# Use a pipeline as a high-level helper
 from transformers import pipeline
 
-pipe = pipeline("conversational", model="google-bert/bert-base-uncased")
-question = "Can you learn new language?"
+pipe = pipeline("fill-mask", model="FacebookAI/roberta-base")
+question = "This word 안녕 is hello in Korean. If I say 안녕 to you. What should you say? <mask>"
 result = pipe(question)
 
 print("===========================================")
